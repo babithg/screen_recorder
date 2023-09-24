@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen Recorder</title>
+</head>
+<body>
+    <button id="startRecording">Start Recording</button>
+    <button id="stopRecording" disabled>Stop Recording</button>
+    <video id="recordedVideo" controls></video>
+    
+    <script>
+        let mediaStream;
+        let mediaRecorder;
+        let chunks = [];
+
+        const startRecordingButton = document.getElementById("startRecording");
+        const stopRecordingButton = document.getElementById("stopRecording");
+        const recordedVideo = document.getElementById("recordedVideo");
+
+        startRecordingButton.addEventListener("click", startRecording);
+        stopRecordingButton.addEventListener("click", stopRecording);
+
+        async function startRecording() {
+            try {
+                const audioDevices = await navigator.mediaDevices.enumerateDevices();
+                const systemMicrophone = audioDevices.find(device => device.kind === 'audioinput');
+                console.log(audioDevices)
+
+                if (systemMicrophone) {
+                    const constraints = {
+                        video: {
+                            width: { ideal: screen.width },
+                            height: { ideal: screen.height },
+                            displaySurface: 'monitor',
+                        },
+                        audio: {
+                            // deviceId: { exact: systemMicrophone.deviceId },
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            sampleRate: 44100,
+                            channelCount: 2,
+                        },
+                    };
+
+                    mediaStream = await navigator.mediaDevices.getDisplayMedia(constraints);
+                    mediaRecorder = new MediaRecorder(mediaStream);
+
+                    mediaRecorder.ondataavailable = event => {
+                        if (event.data.size > 0) {
+                            chunks.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(chunks, { type: "video/webm" });
+                        chunks = [];
+                        const videoURL = URL.createObjectURL(blob);
+                        recordedVideo.src = videoURL;
+                    };
+
+                    mediaRecorder.start();
+                    startRecordingButton.disabled = true;
+                    stopRecordingButton.disabled = false;
+                } else {
+                    console.error("No system microphone found.");
+                }
+            } catch (error) {
+                console.error("Error starting recording:", error);
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== "inactive") {
+                mediaRecorder.stop();
+                mediaStream.getTracks().forEach(track => track.stop());
+                startRecordingButton.disabled = false;
+                stopRecordingButton.disabled = true;
+            }
+        }
+    </script>
+</body>
+</html>
